@@ -3470,6 +3470,20 @@
 
 
 
+    // Escape a value the API deliberately ships unescaped and keep its line
+    // breaks. Right now that is only markdown-textarea custom fields, whose
+    // `value` is the raw markdown source (see AssetsTransformer) - the table
+    // shows that source as plain text, the same way a plain textarea field
+    // reads here. Used both from customFieldsFormatter and directly as the
+    // column formatter on the requestable/requests tables, where the row
+    // carries a bare string rather than the custom_fields object.
+    function plainTextFormatter(value) {
+        if (!value) {
+            return '';
+        }
+        return $('<div/>').text(value).html().replace(/(?:\r\n|\r|\n)/g, '<br>');
+    }
+
     // This is  gross, but necessary so that we can package the API response
     // for custom fields in a more useful way.
     function customFieldsFormatter(value, row) {
@@ -3485,6 +3499,15 @@
             // (for example, the locked icon for encrypted fields)
             var field_column_plain = field_column.replace(/<(?:.|\n)*?> ?/gm, '');
             if ((row.custom_fields) && (row.custom_fields[field_column_plain])) {
+
+                // markdown-textarea is the one element type the transformer does
+                // not e(), so it has to be escaped here, ahead of every other
+                // branch - a column 'escape' => true does not cover what a
+                // formatter returns. The markdown source is shown as-is; the
+                // rendered version lives on the asset detail view.
+                if (row.custom_fields[field_column_plain].element === 'markdown-textarea') {
+                    return plainTextFormatter(row.custom_fields[field_column_plain].value);
+                }
 
                 // If the field type needs special formatting, do that here
                 if ((row.custom_fields[field_column_plain].field_format) && (row.custom_fields[field_column_plain].value)) {

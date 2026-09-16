@@ -136,6 +136,16 @@ class AssetsTransformer
             'last_seen' => Helper::getFormattedDateObject($asset->externalSource?->last_seen, 'datetime'),
         ];
 
+        // markdown-textarea values are emitted verbatim - the source markdown
+        // exactly as it sits in the database, neither rendered to HTML nor
+        // e()'d. Escaping it would corrupt the markdown itself (a leading `>`
+        // becomes `&gt;` and stops being a blockquote), and rendering it forces
+        // API consumers to convert the HTML back to markdown. Rendering lives
+        // in the view layer instead: blade/info-element/customfield.blade.php
+        // for the detail view, customFieldsFormatter for the datatables.
+        //
+        // Consequence: anything that drops this value into the DOM must escape
+        // it itself. Every other element type stays e()'d, as before.
         if (($asset->model) && ($asset->model->fieldset) && ($asset->model->fieldset->fields->count() > 0)) {
             $fields_array = [];
 
@@ -154,7 +164,7 @@ class AssetsTransformer
 
                     $fields_array[$field->name] = [
                         'field' => e($field->db_column),
-                        'value' => ($field->element == 'markdown-textarea' && Gate::allows('assets.view.encrypted_custom_fields')) ? Helper::renderMarkdown($value) : e($value),
+                        'value' => ($field->element == 'markdown-textarea' && Gate::allows('assets.view.encrypted_custom_fields')) ? ($value ?? '') : e($value),
                         'field_format' => $field->format,
                         'element' => $field->element,
                     ];
@@ -168,7 +178,7 @@ class AssetsTransformer
 
                     $fields_array[$field->name] = [
                         'field' => e($field->db_column),
-                        'value' => ($field->element == 'markdown-textarea') ? Helper::renderMarkdown($value) : e($value),
+                        'value' => ($field->element == 'markdown-textarea') ? ($value ?? '') : e($value),
                         'field_format' => $field->format,
                         'element' => $field->element,
                     ];
@@ -347,7 +357,9 @@ class AssetsTransformer
                         $value = Helper::getFormattedDateObject($value, $field->format == 'DATETIME' ? 'datetime' : 'date', false);
                     }
 
-                    $fields_array[$field->db_column] = ($field->element == 'markdown-textarea') ? Helper::renderMarkdown($value) : e($value);
+                    // Verbatim markdown, same contract as transformAsset above.
+                    // The requestable datatable escapes it via plainTextFormatter.
+                    $fields_array[$field->db_column] = ($field->element == 'markdown-textarea') ? ($value ?? '') : e($value);
                 }
 
                 $array['custom_fields'] = $fields_array;

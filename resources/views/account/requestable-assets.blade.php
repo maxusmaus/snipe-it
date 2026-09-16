@@ -106,7 +106,7 @@
 
                                         @foreach(\App\Models\CustomField::get() as $field)
                                             @if (($field->field_encrypted=='0') && ($field->show_in_requestable_list=='1'))
-                                                <th scope="col" class="col-md-2" data-field="custom_fields.{{ $field->db_column }}" data-sortable="true">{{ $field->name }}</th>
+                                                <th scope="col" class="col-md-2" data-field="custom_fields.{{ $field->db_column }}" data-sortable="true"{!! $field->element === 'markdown-textarea' ? ' data-formatter="plainTextFormatter"' : '' !!}>{{ $field->name }}</th>
                                             @endif
                                         @endforeach
                                         <th scope="col" class="col-md-1" data-formatter="assetRequestActionsFormatter" data-field="actions" data-sortable="false">{{ trans('table.actions') }}</th>
