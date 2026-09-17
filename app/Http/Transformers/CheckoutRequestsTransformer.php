@@ -323,8 +323,12 @@ class CheckoutRequestsTransformer
                     false,
                 );
             }
+            // Verbatim markdown, same contract as AssetsTransformer: the source
+            // markdown, neither rendered nor e()'d, so API consumers get back
+            // what was stored. The /requests datatable escapes it via
+            // plainTextFormatter.
             $values[$field->db_column] = $field->element === 'markdown-textarea'
-                ? Helper::renderMarkdown($raw)
+                ? ($raw ?? '')
                 : e($raw);
         }
 

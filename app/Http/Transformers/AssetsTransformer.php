@@ -124,8 +124,28 @@ class AssetsTransformer
             'requests_counter' => (int) $asset->requests_counter,
             'user_can_checkout' => (bool) $asset->availableForCheckout(),
             'book_value' => Helper::formatCurrencyOutput($asset->getDepreciatedValue()),
+
+            // Sync-adapter side-table data. Flat keys (rather than a
+            // nested object) so bs-table can bind columns to them
+            // directly without a subfield formatter. Null when the
+            // asset has never been synced.
+            'primary_mac' => $asset->externalSource?->primary_mac,
+            'primary_ip' => $asset->externalSource?->primary_ip,
+            'external_os' => $asset->externalSource?->os,
+            'external_os_version' => $asset->externalSource?->os_version,
+            'last_seen' => Helper::getFormattedDateObject($asset->externalSource?->last_seen, 'datetime'),
         ];
 
+        // markdown-textarea values are emitted verbatim - the source markdown
+        // exactly as it sits in the database, neither rendered to HTML nor
+        // e()'d. Escaping it would corrupt the markdown itself (a leading `>`
+        // becomes `&gt;` and stops being a blockquote), and rendering it forces
+        // API consumers to convert the HTML back to markdown. Rendering lives
+        // in the view layer instead: blade/info-element/customfield.blade.php
+        // for the detail view, customFieldsFormatter for the datatables.
+        //
+        // Consequence: anything that drops this value into the DOM must escape
+        // it itself. Every other element type stays e()'d, as before.
         if (($asset->model) && ($asset->model->fieldset) && ($asset->model->fieldset->fields->count() > 0)) {
             $fields_array = [];
 
@@ -144,7 +164,7 @@ class AssetsTransformer
 
                     $fields_array[$field->name] = [
                         'field' => e($field->db_column),
-                        'value' => ($field->element == 'markdown-textarea' && Gate::allows('assets.view.encrypted_custom_fields')) ? Helper::renderMarkdown($value) : e($value),
+                        'value' => ($field->element == 'markdown-textarea' && Gate::allows('assets.view.encrypted_custom_fields')) ? ($value ?? '') : e($value),
                         'field_format' => $field->format,
                         'element' => $field->element,
                     ];
@@ -158,7 +178,7 @@ class AssetsTransformer
 
                     $fields_array[$field->name] = [
                         'field' => e($field->db_column),
-                        'value' => ($field->element == 'markdown-textarea') ? Helper::renderMarkdown($value) : e($value),
+                        'value' => ($field->element == 'markdown-textarea') ? ($value ?? '') : e($value),
                         'field_format' => $field->format,
                         'element' => $field->element,
                     ];
@@ -307,10 +327,10 @@ class AssetsTransformer
             'expected_checkin' => Helper::getFormattedDateObject($asset->expected_checkin, 'datetime'),
             'location' => ($asset->location) ? e($asset->location->name) : null,
             'status' => ($asset->status) ? $asset->present()->statusMeta : null,
-            // Category is nested through model; emit the standard
+            // Category is nested through model. Emit the standard
             // {id, name, tag_color} object so the requestable-tab
             // categoriesLinkObjFormatter can render the tag_color
-            // icon + link. Company is direct on Asset; emit the
+            // icon + link. Company is direct on Asset. Emit the
             // matching {id, name} shape.
             'category' => (($asset->model) && ($asset->model->category)) ? [
                 'id' => (int) $asset->model->category->id,
@@ -337,7 +357,9 @@ class AssetsTransformer
                         $value = Helper::getFormattedDateObject($value, $field->format == 'DATETIME' ? 'datetime' : 'date', false);
                     }
 
-                    $fields_array[$field->db_column] = ($field->element == 'markdown-textarea') ? Helper::renderMarkdown($value) : e($value);
+                    // Verbatim markdown, same contract as transformAsset above.
+                    // The requestable datatable escapes it via plainTextFormatter.
+                    $fields_array[$field->db_column] = ($field->element == 'markdown-textarea') ? ($value ?? '') : e($value);
                 }
 
                 $array['custom_fields'] = $fields_array;

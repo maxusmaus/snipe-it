@@ -206,7 +206,7 @@ class CheckoutRequestPresenter extends Presenter
             ->get();
 
         foreach ($fields as $field) {
-            $layout[] = [
+            $column = [
                 'field' => 'requestable.custom_fields.'.$field->db_column,
                 'scope' => 'col',
                 'searchable' => true,
@@ -215,6 +215,16 @@ class CheckoutRequestPresenter extends Presenter
                 'visible' => false,
                 'title' => e($field->name),
             ];
+
+            // markdown-textarea is the one element type the transformer emits
+            // verbatim - unrendered and unescaped - so it needs escaping on the
+            // way into the DOM. Every other element type is already e()'d and
+            // would double-escape if it went through the same formatter.
+            if ($field->element === 'markdown-textarea') {
+                $column['formatter'] = 'plainTextFormatter';
+            }
+
+            $layout[] = $column;
         }
 
         return json_encode($layout);
