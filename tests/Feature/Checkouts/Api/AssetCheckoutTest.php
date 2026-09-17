@@ -12,10 +12,13 @@ use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Event;
 use Notification;
 use PHPUnit\Framework\Attributes\DataProvider;
+use Tests\Support\MakesWatsonValidationLoud;
 use Tests\TestCase;
 
 class AssetCheckoutTest extends TestCase
 {
+    use MakesWatsonValidationLoud;
+
     protected function setUp(): void
     {
         parent::setUp();
@@ -97,6 +100,75 @@ class AssetCheckoutTest extends TestCase
             ->assertStatusMessageIs('error');
 
         Event::assertNotDispatched(CheckoutableCheckedOut::class);
+    }
+
+    public function test_asset_checkout_infers_user_target_when_checkout_to_type_omitted()
+    {
+        $asset = Asset::factory()->create();
+        $user = User::factory()->create();
+
+        $this->actingAsForApi(User::factory()->checkoutAssets()->create())
+            ->postJson(route('api.asset.checkout', $asset), [
+                'assigned_user' => $user->id,
+            ])
+            ->assertOk()
+            ->assertStatusMessageIs('success');
+
+        $asset->refresh();
+        $this->assertTrue($asset->assignedTo()->is($user));
+    }
+
+    public function test_asset_checkout_infers_asset_target_when_checkout_to_type_omitted()
+    {
+        $asset = Asset::factory()->create();
+        $target = Asset::factory()->create();
+
+        $this->actingAsForApi(User::factory()->checkoutAssets()->create())
+            ->postJson(route('api.asset.checkout', $asset), [
+                'assigned_asset' => $target->id,
+            ])
+            ->assertOk()
+            ->assertStatusMessageIs('success');
+
+        $asset->refresh();
+        $this->assertTrue($asset->assignedTo()->is($target));
+    }
+
+    public function test_asset_checkout_infers_location_target_when_checkout_to_type_omitted()
+    {
+        $asset = Asset::factory()->create();
+        $location = Location::factory()->create();
+
+        $this->actingAsForApi(User::factory()->checkoutAssets()->create())
+            ->postJson(route('api.asset.checkout', $asset), [
+                'assigned_location' => $location->id,
+            ])
+            ->assertOk()
+            ->assertStatusMessageIs('success');
+
+        $asset->refresh();
+        $this->assertTrue($asset->assignedTo()->is($location));
+    }
+
+    public function test_asset_checkout_rejects_multiple_target_fields()
+    {
+        $asset = Asset::factory()->create();
+        $user = User::factory()->create();
+        $location = Location::factory()->create();
+
+        $response = $this->actingAsForApi(User::factory()->checkoutAssets()->create())
+            ->postJson(route('api.asset.checkout', $asset), [
+                'assigned_user' => $user->id,
+                'assigned_location' => $location->id,
+            ])
+            ->assertOk()
+            ->assertStatusMessageIs('error');
+
+        $this->assertArrayHasKey('assigned_user', $response->json('messages'));
+
+        $asset->refresh();
+        $this->assertNull($asset->assigned_to);
+        $this->assertNull($asset->assigned_type);
     }
 
     public function test_cannot_checkout_across_companies_when_full_company_support_enabled()

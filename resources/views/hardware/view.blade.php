@@ -188,11 +188,51 @@
 
 
                                 @if (($asset->model) && ($asset->model->fieldset))
-                                    @foreach($asset->model->fieldset->fields as $field)
-                                        <x-data-row :label="$field->name">
-                                            <x-info-element.customfield :item="$asset" :field="$field"/>
-                                        </x-data-row>
+                                    @foreach($asset->model->fieldset->groupedFields() as $group => $fields)
+                                        @if ($group)
+                                            <dt class="custom-field-group-heading">{{ $group }}</dt>
+                                        @endif
+                                        @foreach($fields as $field)
+                                            <x-data-row :label="$field->name">
+                                                <x-info-element.customfield :item="$asset" :field="$field"/>
+                                            </x-data-row>
+                                        @endforeach
                                     @endforeach
+                                @endif
+
+                                {{-- Sync-adapter-populated network / OS
+                                     inventory. Only renders per-field
+                                     when a value exists so assets that
+                                     never got synced (or that skipped
+                                     these mappings) don't show empty
+                                     rows. --}}
+                                @if ($asset->externalSource)
+                                    @if ($asset->externalSource->primary_mac)
+                                        <x-data-row :label="trans('admin/settings/sync_adapters.field_mac')" copy_what="external_mac">
+                                            {{ $asset->externalSource->primary_mac }}
+                                        </x-data-row>
+                                    @endif
+                                    @if ($asset->externalSource->primary_ip)
+                                        <x-data-row :label="trans('admin/settings/sync_adapters.field_ip')" copy_what="external_ip">
+                                            {{ $asset->externalSource->primary_ip }}
+                                        </x-data-row>
+                                    @endif
+                                    @if ($asset->externalSource->os)
+                                        <x-data-row :label="trans('admin/settings/sync_adapters.field_os')" copy_what="external_os">
+                                            {{ $asset->externalSource->os }}
+                                        </x-data-row>
+                                    @endif
+                                    @if ($asset->externalSource->os_version)
+                                        <x-data-row :label="trans('admin/settings/sync_adapters.field_os_version')" copy_what="external_os_version">
+                                            {{ $asset->externalSource->os_version }}
+                                        </x-data-row>
+                                    @endif
+                                    @if ($asset->externalSource->last_seen)
+                                        <x-data-row :label="trans('admin/settings/sync_adapters.field_last_seen')" copy_what="external_last_seen">
+                                            {{ $asset->externalSource->last_seen->diffForHumans() }}
+                                            <span class="text-muted">({{ Helper::getFormattedDateObject($asset->externalSource->last_seen, 'datetime', false) }})</span>
+                                        </x-data-row>
+                                    @endif
                                 @endif
 
 
